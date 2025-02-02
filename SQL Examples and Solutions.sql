@@ -367,6 +367,111 @@ AND length(description) > 100;
 SELECT timediff('1980-01-01', 'now');
 SELECT timediff('now', '1980-01-01');
 
+-- 3.4: Sorting Data: The ORDER BY Clause
+
+-- 3.4.1
+
+SELECT	LastName, FirstName
+FROM	customers
+WHERE	Country = 'USA';
+ORDER BY	LastName
+LIMIT	10;
+
+-- 3.4.2
+
+SELECT	Name, Composer, Milliseconds
+FROM		tracks
+ORDER BY 	Milliseconds DESC
+LIMIT	15;
+
+-- 3.4.3
+
+SELECT 	CompanyName, Address, City, Country
+FROM		customers
+WHERE 	Country <> 'USA'
+ORDER BY	country, CompanyName;
+
+-- 3.4.4
+
+SELECT FirstName, LastName, 
+Company, City, State, Country
+FROM Customers 
+ORDER BY Company NULLS LAST;
+
+-- 3.4.5
+
+SELECT	LastName, FirstName
+FROM		customers
+WHERE	Country = 'USA'
+ORDER BY	LastName COLLATE NOCASE;
+
+-- 3.4.6
+
+SELECT DISTINCT 	City, State, Country
+FROM				customers
+ORDER BY			City;
+
+-- 3.4.7
+
+SELECT DISTINCT	ProductName
+FROM				invoices
+WHERE			Quantity >= 100
+ORDER BY			ProductName;
+
+-- 3.4.8
+
+SELECT	ProductName 
+FROM 	Products 
+ORDER BY 	Length(ProductName), ProductName;
+
+-- 3.4.9
+
+SELECT 		Name, Composer, Milliseconds,
+			strftime('%H:%M:%S', Milliseconds / 1000, 'unixepoch') AS [Time (H:M:S)] 
+FROM		tracks
+ORDER BY	Milliseconds DESC;
+
+
+-- 3.4 Challenge Solutions
+
+-- 1. You'll probably notice that all the composers in the query from Step 2 in this chapter 
+-- are null because it simply isn't filled in for the longest tracks in the database. 
+-- In the last chapter, you saw a way to omit null values using the WHERE clause. Add a WHERE 
+-- clause to the query in Step 2 to show the 15 longest tracks that actually have composers listed.
+
+SELECT	Name, Composer, Milliseconds
+FROM		tracks
+WHERE	Composer IS NOT NULL
+ORDER BY 	Milliseconds DESC
+LIMIT	15;
+
+-- 2. The groups listed in the Chinook artists table are not in alphabetical order. Create a query 
+-- that will return the names in order.
+
+SELECT Name FROM artists ORDER BY Name;
+
+-- 3. Use the LIKE keyword to find all the artists whose name starts with “The” and return them alphabetically.
+
+SELECT Name FROM artists 
+WHERE Name LIKE 'The%' ORDER BY Name;
+
+-- 4. Query the Northwind customers table for a list of customers in the USA who have fax numbers. 
+-- Show company name and fax number and sort by company name.
+
+SELECT CompanyName, Fax
+FROM Customers
+WHERE fax IS NOT NULL
+ORDER BY CompanyName;
+
+-- 5. From the Sakila database, retrieve a list of the 50 longest movies which include deleted 
+-- scenes as one of the special features.
+
+SELECT title, description, length, special_features
+FROM film
+WHERE special_features LIKE '%deleted scenes%'
+ORDER BY length DESC
+LIMIT 50;
+
 
 
 
