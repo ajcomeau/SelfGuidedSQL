@@ -472,6 +472,431 @@ WHERE special_features LIKE '%deleted scenes%'
 ORDER BY length DESC
 LIMIT 50;
 
+-- 3.5: Joining Tables
+
+-- Intro
+
+SELECT 		a.title AS Album, t.Name AS Track, t.Composer, strftime('%M:%S', Milliseconds / 1000,
+ 			'unixepoch') AS [Length]
+FROM 		tracks t
+INNER JOIN 	albums a 
+ON			a.AlbumId = t.AlbumId
+WHERE 		a.title = 'Jagged Little Pill';
+
+-- 3.5.1
+
+SELECT 		al.title, ar.name as [Artist]
+FROM 		albums al
+INNER JOIN 	artists ar
+ON 			ar.ArtistId = al.ArtistId
+ORDER BY 		al.Title;
+
+-- 3.5.2
+
+SELECT ar.ArtistId, ar.name as [Artist], al.title
+FROM artists ar
+LEFT OUTER JOIN albums al
+ON al.ArtistId = ar.ArtistId
+ORDER BY al.Title;
+
+-- 3.5.3
+
+SELECT 		c.LastName, c.FirstName,
+ 			concat(e.LastName, ', ', e.FirstName) 
+ 			AS [Support Rep]
+FROM 		customers c 
+LEFT JOIN 	employees e 
+ON 			e.EmployeeId = c.SupportRepId;
+
+-- 3.5.4
+
+SELECT 		c.LastName, c.FirstName,
+ 			concat(e.LastName, ', ', e.FirstName) 
+ 			AS [Support Rep]
+FROM 		customers c 
+RIGHT JOIN 	employees e 
+ON 			e.EmployeeId = c.SupportRepId;
+
+-- 3.5.5
+
+SELECT 		c.LastName, c.FirstName,
+ 			concat(e.LastName, ', ', e.FirstName) 
+ 			AS [Support Rep] 
+FROM			employees e 
+RIGHT JOIN 	customers c 
+ON 			e.EmployeeId = c.SupportRepId;
+
+-- 3.5.6
+
+SELECT 		c.LastName, c.FirstName,
+ 			concat(e.LastName, ', ', e.FirstName) 
+  			AS 'Support Rep'
+FROM 		employees e 
+FULL JOIN		customers c 
+ON			e.EmployeeId = c.SupportRepId
+WHERE		c.LastName IS NULL or e.LastName IS NULL;
+
+-- 3.5.7
+
+SELECT 		e.LastName, e.FirstName, 
+concat(m.LastName, ', ', m.FirstName) as [Reporting to:]
+FROM 		Employees e
+INNER JOIN	Employees m
+ON 			m.EmployeeId = e.ReportsTo;
+
+-- 3.5.8
+
+SELECT 		concat(e.LastName, ', ', e.FirstName) as [Sales Rep],c.CategoryName
+FROM 		employees e
+CROSS JOIN 	Categories c
+WHERE 		e.title = 'Sales Representative';
+
+-- 3.5.9
+
+SELECT 		al.title, ar.name as [Artist]
+FROM 		albums al
+NATURAL JOIN	artists ar
+ORDER BY 		title;
+
+-- 3.5.10
+
+SELECT 		f.title, f.description, 
+ 			f.length, f.rating
+FROM 		film f
+INNER JOIN 	film_category fc
+ON 			fc.film_id = f.film_id
+INNER JOIN 	category c
+ON 			c.category_id = fc.category_id
+WHERE 		c.name = 'Action';
+
+-- 3.5.11
+
+SELECT 		concat(a.first_name, ' ', last_name) AS [Actor]
+FROM 		actor a
+INNER JOIN 	film_actor fa
+ON 			fa.actor_id = a.actor_id
+INNER JOIN 	film f
+ON 			fa.film_id = f.film_id
+WHERE 		f.title = 'CADDYSHACK JEDI';
+
+-- 3.5.12
+
+SELECT 		a.actor_id, f.title 
+FROM 		actor a
+INNER JOIN 	film_actor fa
+ON 			fa.actor_id = a.actor_id
+INNER JOIN 	film f
+ON 			fa.film_id = f.film_id
+WHERE 		a.first_name = 'ED' 
+AND			a.last_name = 'CHASE';
+
+-- 3.5.13
+
+SELECT 		cl.*, c.email 
+FROM 		customer_list cl
+INNER JOIN 	customer c
+ON			c.customer_id = cl.ID;
+
+-- 3.5.14
+
+SELECT 		cl.*, email, sa.address, 
+ 			sa.address2, sa.postal_code, sa.phone
+FROM 		customer_list cl
+INNER JOIN 	customer c
+ON 			c.customer_id = cl.ID
+INNER JOIN 	store s
+ON 			s.store_id = cl.SID
+INNER JOIN 	address sa
+ON 			sa.address_id = s.address_id;
+
+-- 3.5.15
+
+SELECT 		cl.*, email, concat(sa.address,' ',
+ 			sa.address2, ', ' , city.city, 
+ 			'  ', sa.postal_code, ', ', co.country) 
+ 			AS [Store Location], 
+ 			sa.phone as 'Store Phone'
+FROM 		customer_list cl
+INNER JOIN 	customer c
+ON 			c.customer_id = cl.ID
+INNER JOIN 	store s
+ON 			s.store_id = cl.SID
+INNER JOIN 	address sa
+ON 			sa.address_id = s.address_id
+INNER JOIN 	city
+ON 			city.city_id = sa.address_id
+INNER JOIN 	country co
+ON 			co.country_ID = city.country_id
+ORDER BY	c.last_name;
+
+
+-- 3.5 Challenge Solutions
+
+-- 1. On the Chinook database, write a query that lists all invoices before January 1, 2010 
+-- with the invoice ID, invoice date, customer first and last name, customer company and e-mail address. 
+-- (Hint: You'll need to join the Invoices and Customers table. Also, refer to the section on searching 
+-- by dates in section 3.3.)
+
+SELECT		i.InvoiceId, i.InvoiceDate,  
+ 			concat(c.LastName, ', ', c.FirstName) 
+ 			AS [Customer], 
+ 			c.Company, c.email
+FROM			invoices i
+INNER JOIN	customers c
+ON			c.CustomerId = i.CustomerId
+WHERE		i.InvoiceDate < '2010-01-01'
+ORDER BY		i.InvoiceDate;
+
+-- 2. In the Sakila database, write queries that return the rental and return dates for a specific 
+-- movie by movie title and film ID. (Hint: You'll need to join the film, inventory and rental tables.)  
+-- You'll notice that the rental times overlap because there is more than one copy of the film so add the 
+-- inventory ID to the query. The movie title and film ID criteria can be combined into a single WHERE 
+-- statement so that the query can return two films if specified.
+SELECT		f.title, r.rental_date, r.return_date, 
+ 			i.inventory_id
+FROM			Sakila.film f
+inner JOIN	Sakila.inventory i
+ON			i.film_id = f.film_id
+INNER JOIN	rental r
+ON			r.inventory_id = i.inventory_id
+WHERE		f.title = 'ANTITRUST TOMATOES'
+OR			f.film_id = 29;
+
+-- 3. On the Northwind database, get a list of all products with product name, category name and the 
+-- company name of the supplier. Order by category and then product name.
+SELECT		p.ProductName, c.description, 
+ 			s.CompanyName
+FROM			Northwind.Products p
+INNER JOIN	Categories c
+ON			c.CategoryID = p.CategoryID
+INNER JOIN	Suppliers s
+ON			s.SupplierID = p.SupplierID
+ORDER BY		c.description, p.ProductName;
+
+-- 4. Get a list of all Northwind orders shipped by the company 'Speedy Express'. List the Order ID, 
+-- customer's company name, the order date, date shipped and the freight.
+SELECT		o.OrderID, c.CompanyName, o.OrderDate, 
+ 			o.ShippedDate, o.Freight
+FROM			Northwind.Orders o
+INNER JOIN	Northwind.Shippers s
+ON			s.ShipperID = o.ShipVia
+INNER JOIN	Northwind.Customers c
+ON			c.CustomerId = o.CustomerId
+WHERE		s.CompanyName = 'Speedy Express';
+
+-- 5. On the Chinook database write a query that will return all the tracks that a customer has been 
+-- invoiced for. You can search by customer ID or name. Include the invoice date, track name, album title 
+-- and the name of the genre. Sort by the invoice date. You will need to consult the Chinook diagram and 
+-- the query will involve six tables. 
+SELECT 		i.InvoiceDate, t.name, a.title, g.name
+FROM			customers c
+INNER JOIN	invoices i
+ON			i.customerId = c.CustomerId
+INNER JOIN	invoice_items ii
+ON			ii.InvoiceId = i.InvoiceId
+INNER JOIN	tracks t
+ON			t.TrackId = ii.TrackId
+INNER JOIN	albums a
+ON			a.AlbumId = t.AlbumId
+INNER JOIN	genres g
+ON			g.GenreId = t.GenreId
+WHERE		c.customerid = 27
+order by	i.InvoiceDate;
+
+-- 3.6: Defining Groups: The GROUP BY Clause
+
+-- 3.6.1
+
+SELECT 	COUNT(*) AS [Invoices],
+ 		concat(c.LastName, ', ', c.FirstName) 
+ 		AS [Customer]
+FROM 	invoices i
+INNER JOIN customers c
+ON 		C.CustomerId = i.InvoiceId
+GROUP BY 	i.CustomerId
+ORDER BY 	count(*) DESC;
+
+-- 3.6.2
+
+SELECT 	COUNT(*)
+FROM 	customers
+WHERE 	country = 'Canada';
+
+SELECT 	COUNT(DISTINCT country)
+FROM 	customers;
+
+SELECT	DISTINCT Country
+FROM 	customers;
+
+-- 3.6.3
+
+SELECT 		COUNT(*) AS [Invoices], c.Country
+FROM 		invoices i
+INNER JOIN 	customers c
+ON 			c.CustomerId = i.InvoiceId
+GROUP BY 		c.country
+ORDER BY 		[Invoices] DESC;
+
+-- 3.6.4
+
+SELECT 	COUNT(company)
+FROM 	customers;
+
+-- 3.6.5
+
+SELECT	t.AlbumId, a.title, COUNT(*) AS track_count
+FROM		tracks t
+INNER JOIN  	albums a
+ON 		a.AlbumId = t.AlbumId
+GROUP BY	t.AlbumId;
+
+-- 3.6.6
+
+SELECT 	CategoryName, ROUND(AVG(UnitPrice), 2) 
+ 		AS [Average Price] 
+FROM 	[Alphabetical List of Products]
+GROUP BY 	CategoryName
+ORDER BY 	[Average Price] DESC;
+
+-- 3.6.7
+
+SELECT 	GenreId, 
+ROUND	(AVG(Bytes / 1024 / 1024), 2) 
+ 		AS [Avg Size (MB)]
+FROM 	tracks
+GROUP BY 	GenreId;
+
+-- 3.6.8
+
+SELECT 		t.GenreId, g.name, 
+  			ROUND(AVG(Bytes / 1024 / 1024), 2) 
+ 			AS [Avg Size (MB)]
+FROM 		tracks t 
+INNER JOIN 	genres g
+ON 			g.GenreId = t.GenreId
+GROUP BY 		t.GenreId, g.name;
+
+-- 3.6.9
+
+SELECT * FROM invoices;
+
+SELECT 	InvoiceDate, BillingCountry FROM invoices;
+
+SELECT	MIN(InvoiceDate) AS [First Invoice], 
+ 		BillingCountry
+FROM		invoices
+GROUP BY	BillingCountry
+ORDER BY	[First Invoice];
+
+-- 3.6.10
+
+SELECT TOTAL(replacement_cost) FROM film;
+
+-- 3.6.11
+
+SELECT	GROUP_CONCAT(DISTINCT BillingCity) AS Cities,
+ 		BillingCountry
+FROM		invoices
+GROUP BY 	BillingCountry;
+
+-- 3.6.12
+
+SELECT 	CategoryName, ROUND(AVG(UnitPrice), 2) AS  
+ 		[Average Price] 
+FROM 	[Alphabetical List of Products]
+GROUP BY	CategoryName
+HAVING	[Average Price] > 25
+ORDER BY 	[Average Price] DESC;
+
+-- 3.6.13
+
+SELECT 	strftime('%m-%Y', ShippedDate) AS Month, 
+ 		ROUND(SUM(Subtotal), 2) as [Monthly Sales]
+FROM		[Summary of Sales By Year]
+GROUP BY	Month
+HAVING	[Monthly Sales] > 75000
+ORDER BY	ShippedDate;
+
+
+-- 3.6 Challenge Solutions
+
+-- 1. As promised, your first challenge is to determine the total value of the inventory in 
+-- the Sakila database using the replacement cost field in the film table. Remember that the
+-- inventory table actually stores a record for each copy of the movies available so you'll 
+-- need to link to that and then use the TOTAL or SUM function to determine the total investment 
+-- the business has in inventory.
+
+SELECT		TOTAL(f.replacement_cost)
+FROM			inventory i
+INNER JOIN	film f
+ON			f.film_id = i.film_id
+
+-- 2. Write a query to pull all the playlists from the Chinook Playlist table and how many 
+-- tracks they have. Show both the playlist ID and the playlist name. Sort by track count descending. 
+-- Then modify the query so that you are showing the playlists with only a single track on them.
+
+Remove the HAVING clause below to show all playlists sorted descending.
+SELECT 		p.PlaylistId, p.name, 
+ 			count(pt.trackID) AS [Track Count]
+FROM			playlists p
+INNER JOIN  	playlist_track pt
+ON 			pt.PlaylistId = p.PlaylistId
+GROUP BY 		p.PlaylistId, p.name
+HAVING 		[Track Count] = 1
+ORDER BY 		[Track Count] DESC;
+
+-- 3. You can use both the WHERE and HAVING clauses in a single query to limit individual records
+-- first and then limit based on group. Change the playlist query in challenge #2 to show playlists 
+-- of all lengths but only those that contain songs from a specific composer.
+
+SELECT 		p.PlaylistId, p.name, 
+ 			count(pt.trackID) AS [Track Count]
+FROM			playlists p
+INNER JOIN  	playlist_track pt
+ON 			pt.PlaylistId = p.PlaylistId
+INNER JOIN 	tracks t
+ON 			t.TrackId = pt.TrackId
+WHERE 		t.Composer LIKE '%Ballard%'
+GROUP BY 		p.PlaylistId, p.name
+ORDER BY 		[Track Count] DESC;
+
+-- 4. In the Northwind database, write a query that returns the number of orders taken per employee 
+-- for the first quarter of 1997 (1/1 to 3/31). Sort by the number of orders descending. Return the 
+-- EmployeeID fields, first and last name concatenated into one name field and the count of the orders.
+
+SELECT		e.EmployeeId, concat(e.FirstName, ' ', 
+ 			e.LastName) as [Employee], 
+			count(*) as [Order Count]
+FROM			Orders o
+INNER JOIN	Employees e
+ON			e.EmployeeId = o.EmployeeId
+WHERE		o.OrderDate > '1996-12-31' AND 
+ 			o.OrderDate < '1997-04-01'
+GROUP BY 		e.EmployeeId, [Employee]
+ORDER BY		[Order Count] DESC;
+
+-- 5. In Northwind, write a query that returns the total of all invoicing for each month, including 
+-- freight. Use the order date to get the month and sort chronologically. You can use the Invoices view 
+-- to avoid doing any joins and the Extended Price field to get a total of all products on each invoice. 
+-- (Hint: You can add two fields, such as Extended Price and Freight, within the SUM() function to get the 
+-- total of both for all records in the group.)
+
+SELECT	strftime('%m-%Y', OrderDate) AS [Month], 
+ 		ROUND(SUM(ExtendedPrice + Freight), 2) 
+ 		AS [Month Total]
+FROM		Invoices
+GROUP BY	[Month]
+ORDER BY	OrderDate;
+
+
+
+
+
+
+
+
+
+
 
 
 
