@@ -889,33 +889,655 @@ GROUP BY	[Month]
 ORDER BY	OrderDate;
 
 
+-- 3.7: Breaking it Down: Subqueries and Common Table Expressions
+
+-- Intro
+
+SELECT 		a.title, tc.track_count AS 'Songs'
+FROM 		albums a
+INNER JOIN	(SELECT	AlbumId, COUNT(*) AS track_count
+ 			FROM		tracks 
+ 			GROUP BY	AlbumId) AS tc
+ON 		tc.AlbumId = a.AlbumId
+ORDER BY 	a.title;
+
+-- 3.7.1
+
+SELECT	ii.InvoiceId
+FROM		invoice_items ii
+GROUP BY	ii.InvoiceId
+HAVING	COUNT(ii.TrackID) > 12 ;
+
+-- 3.7.2
+
+SELECT		FirstName, LastName, Address, City, State
+FROM			Customers c
+INNER JOIN	Invoices i
+ON			i.CustomerId = c.CustomerId
+WHERE		i.InvoiceId IN 
+			(select 	ii.InvoiceId
+			FROM 	invoice_items ii
+			GROUP BY 	ii.InvoiceId
+			HAVING 	COUNT(ii.TrackID) > 12);
+
+-- 3.7.3
+
+SELECT		FirstName, LastName, Address, City, State
+FROM			Customers c
+INNER JOIN	invoices i
+ON			i.CustomerId = c.CustomerId
+INNER JOIN 	(SELECT 	ii.InvoiceId
+			FROM 	invoice_items ii
+			GROUP BY 	ii.InvoiceId
+			HAVING 	count(ii.TrackID) > 12) AS LI
+ON			LI.InvoiceId = i.InvoiceId ;
+
+-- 3.7.4
+
+SELECT 		c.customer_id
+FROM 		Customer c
+INNER JOIN 	Payment p
+ON 			p.customer_id = c.customer_id
+GROUP BY 		c.customer_id
+HAVING 		TOTAL(p.amount) > 150;
+
+-- 3.7.5
+
+SELECT		* 
+FROM			customer_list cl
+WHERE		cl.id IN
+ 	(SELECT		c.customer_id
+ 	FROM 		Customer c
+ 	INNER JOIN 	payment p
+ 	ON 			p.customer_id = c.customer_id
+ 	GROUP BY 		c.customer_id
+ 	HAVING 		TOTAL(p.amount) > 150)
+ORDER BY 		cl.name;
+
+-- 3.7.6
+
+WITH [Order Totals] AS
+(SELECT OrderID, TOTAL(ExtendedPrice) AS OT 
+ 	FROM [Order Details Extended] 
+ 	GROUP BY OrderID)
+SELECT 	OrderID, PRINTF("%.2f", OT) AS [Order Total] FROM 	[Order Totals]
+ORDER BY	OT DESC
+LIMIT 	20;
+
+-- 3.7.7
+
+SELECT 	strftime('%Y-%m', OrderDate) AS Period,  
+ 		EmployeeId, COUNT(OrderID) as [Order Count]
+FROM 	Orders
+GROUP BY 	Period, EmployeeId;
+
+-- 3.7.8
+
+WITH [MonthlyTotals] AS 
+ 	(SELECT 	strftime('%Y-%m', OrderDate) AS Period,  
+ 	EmployeeId, COUNT(OrderID) as [Order Count]
+ 	FROM 	Northwind.Orders
+ 	GROUP BY 	Period, EmployeeId)
+SELECT	Period, MAX([Order Count]) AS [Max Orders], 
+ 		mt.EmployeeId, e.FirstName, e.LastName
+FROM 	MonthlyTotals mt
+INNER JOIN Northwind.Employees e
+ON 		e.EmployeeId = mt.EmployeeId
+GROUP BY 	Period;
+
+-- Big spender's solution
+
+SELECT 		cl.* 
+FROM 		customer_list cl
+INNER JOIN 
+	(SELECT 		c.customer_id
+	FROM 		Customer c
+	INNER JOIN 	payment p
+	ON 			p.customer_id = c.customer_id
+	GROUP BY 		c.customer_id
+	HAVING 		TOTAL(p.amount) > 150) AS HighSpend
+ON 			HighSpend.customer_id = cl.ID
+ORDER BY 		cl.name;
+
+-- Northwind order totals solution
+
+SELECT 	OrderID, printf("$%.2f", TOTAL(ExtendedPrice)) 
+ 		AS [Order Total] 
+FROM		[Order Details Extended]
+GROUP BY	OrderID
+ORDER BY	TOTAL(ExtendedPrice) DESC
+LIMIT	20;
 
 
+-- 3.7 Challenge solutions
+
+-- 1. In the Sakila database, create a query that will return the five movies that earned 
+-- the most from rentals within a specific month. Remember that you will need to join to multiple 
+-- tables to create a path from the Film table to the Payment table.
+
+-- This was a challenging one and I chose to use a common table expression. It starts with the query 
+-- to get the titles and sales for each month as the inner query. From that, the outer query sorts 
+-- the results, filters by the data and gets the top five rows.
+
+WITH [SalesByTitleMonth] AS
+(SELECT	f.title AS FilmTitle, 
+ SUM(p.amount) AS [Total Sales],
+ strftime('%Y-%m', r.rental_date) AS Period
+ FROM 		payment AS p
+ INNER JOIN 	rental AS r 
+ ON 			p.rental_id = r.rental_id
+ INNER JOIN 	inventory AS i
+ ON 			r.inventory_id = i.inventory_id
+ INNER JOIN 	film AS f 
+ ON 			i.film_id = f.film_id
+ GROUP BY 	f.title, Period)
+SELECT Period, FilmTitle, [Total Sales] 
+FROM SalesByTitleMonth
+WHERE Period = '2005-05'
+ORDER BY [Total Sales] DESC
+LIMIT 5;
+
+-- 2. In the Chinook database, get a listing of albums with more than 20 tracks. Return the album 
+-- title, the artist and the number of tracks on the album.
+
+-- This solution joins to a subquery and references one of its fields for the track count.
+
+SELECT a.title, ar.name as Artist, tc.[Track Count]
+FROM albums a
+INNER JOIN (
+    SELECT AlbumId, COUNT(*) AS [Track Count]
+    FROM tracks
+    GROUP BY AlbumId
+    HAVING COUNT(*) > 20
+) AS tc ON a.AlbumId = tc.AlbumId
+INNER JOIN artists ar
+ON ar.ArtistId = a.ArtistId
+ORDER BY a.title;
+
+-- 3. In the Chinook database, get a listing of customers who have invoices with more than 12 
+-- tracks listed on them. List each customer only once, even if they have multiple invoices with 
+-- more than 12 tracks.
+
+SELECT 	c.FirstName, c.LastName, 
+ 		c.Address, c.City, c.State
+FROM 	customers c
+INNER JOIN invoices i 
+ON 		i.CustomerId = c.CustomerId
+WHERE 	i.InvoiceId IN (
+    SELECT 	InvoiceId
+    FROM 		invoice_items
+    GROUP BY 	InvoiceId
+    HAVING 	COUNT(TrackId) > 12
+)
+GROUP BY 	c.CustomerId
+ORDER BY 	LastName;
+
+-- 4. In the Sakila database, get a contact list for all the customers who have spent more than $150.
+
+-- The customer_list view provides the contact information without having to link to a bunch of different tables.
+
+SELECT 	cl.*
+FROM 	customer_list cl
+INNER JOIN (
+    SELECT 	c.customer_id
+    FROM 		customer c
+    INNER JOIN payment p 
+    ON 		p.customer_id = c.customer_id
+    GROUP BY 	c.customer_id
+    HAVING 	SUM(p.amount) > 150
+) AS HighSpend 
+ON 		HighSpend.customer_id = cl.id
+ORDER BY 	cl.name;
+
+-- 5. In the Northwind database, find the first and last name of the employee with the most 
+-- orders for each month.
+
+-- The common table expression first calculates the number of order per month, per employee 
+-- and then the main query finds the most active employee for each month.
+
+WITH MonthlyTotals AS (
+    SELECT strftime('%Y-%m', OrderDate) AS Period,
+           EmployeeId,
+           COUNT(OrderID) AS OrderCount
+    FROM Orders
+    GROUP BY Period, EmployeeId
+)
+SELECT 	mt.Period, MAX(mt.OrderCount)
+ 		AS [Order Count], 
+ 		e.FirstName, e.LastName
+FROM 	MonthlyTotals mt
+INNER JOIN Employees e 
+ON 		e.EmployeeId = mt.EmployeeId
+GROUP BY 	mt.Period;
+
+-- 3.8 Storing Queries: Creating Views
+
+-- 3.8.1
+
+CREATE VIEW vTrackListing AS
+ 	SELECT	tr.name AS [Track Name], 
+ 			al.title AS Album, 
+ 			ar.name AS Artist, tr.Composer,     
+ 			tr.Milliseconds, tr.UnitPrice
+ 	FROM			tracks tr
+ 	INNER JOIN	albums al
+ 	ON			al.AlbumId = tr.AlbumId
+ 	INNER JOIN	artists ar
+ 	ON			ar.ArtistId = al.ArtistId
+ 	ORDER BY		tr.name;
+
+-- 3.8.2
+
+SELECT * FROM vTrackListing
+WHERE Artist = 'Led Zeppelin'
+ORDER BY Album;
+
+-- 3.8.3
+
+DROP VIEW vTrackListing;
+
+-- 3.8.4
+
+SELECT	tr.TrackId, tr.name AS [Track Name], 
+ 		al.AlbumId, al.title AS Album, 
+ 		ar.ArtistID, ar.name AS Artist, tr.Composer,     
+ 		strftime('%M:%S', Milliseconds / 1000,
+ 			'unixepoch') AS [Length], 
+ 		tr.UnitPrice;
+
+-- 3.8.6
+
+CREATE VIEW vTrackListing AS
+(TrackID, Track, AlbumID, Album,
+ ArtistID, Artist, Composer, Minutes, PerUnit)
+ 	SELECT	tr.TrackId, tr.name, 
+ 			al.AlbumId, al.title, 
+ 			ar.ArtistID, ar.name, tr.Composer,     
+ 			strftime('%M:%S', Milliseconds / 1000,
+ 			'unixepoch'), tr.UnitPrice
+ 	FROM			tracks tr
+ 	INNER JOIN	albums al
+ 	ON			al.AlbumId = tr.AlbumId
+ 	INNER JOIN	artists ar
+ 	ON			ar.ArtistId = al.ArtistId
+ 	ORDER BY		tr.name;
+
+	
+-- 3.8 Challenge Solutions
+
+-- 1. Create a view that lists all invoices in the Chinook database along with the customer's first 
+-- and last name, phone, e-mail and the total of the invoice. The CREATE statement should not throw 
+-- an error if you run it a second time.
+
+-- The IF NOT EXISTS clause in the CREATE statement prevents SQLite from attempting to create a view that already exists.
+
+CREATE VIEW IF NOT EXISTS vInvoiceTotals
+AS
+SELECT 	i.InvoiceId, i.CustomerId, i.InvoiceDate, 
+ 		c.LastName, c.FirstName, 
+ 		t.[Invoice Total], c.phone, c.email
+FROM 	invoices i
+INNER JOIN customers c
+ON 		c.CustomerId = i.CustomerId
+INNER JOIN
+ 	(SELECT 	InvoiceId, SUM(UnitPrice * Quantity) 
+ 			AS [Invoice Total]
+ 	FROM 	invoice_items ii
+ 	GROUP BY 	InvoiceId) t
+ON 	t.InvoiceId = i.InvoiceId;
+
+-- 2. Drop the view from the previous exercise and re-create it supplying alternative names of your choosing for each column.
+
+-- Remember that, if you use alternative names as part of the CREATE statement, you need to define one for 
+-- each column, even if you're not actually changing the name.
+
+DROP VIEW vInvoiceTotals;
+
+CREATE VIEW IF NOT EXISTS vInvoiceTotals
+(InvoiceID, CustomerID, [Invoice Date], [Last Name], [First Name], [Total], [Phone Number], [E-mail])
+AS
+SELECT 	i.InvoiceId, i.CustomerId, i.InvoiceDate, 
+ 		c.LastName, c.FirstName, 
+ 		t.[Invoice Total], c.phone, c.email
+FROM 	invoices i
+INNER JOIN customers c
+ON 		c.CustomerId = i.CustomerId
+INNER JOIN
+ 	(SELECT 	InvoiceId, SUM(UnitPrice * Quantity) 
+ 			AS [Invoice Total]
+ 	FROM 	invoice_items ii
+ 	GROUP BY 	InvoiceId) t
+ON 	t.InvoiceId = i.InvoiceId;
+
+-- 3. In the Northwind database, create a view with reordering information on current products (Discontinued = 0) 
+-- including the category name, supplier company and contact name and phone number. 
+
+CREATE TEMP VIEW IF NOT EXISTS vProductContactList
+AS
+SELECT 	p.ProductName, p.QuantityPerUnit, plUnitPrice,
+ 		c.CategoryName, p.Description, s.CompanyName,  
+ 		s.ContactName, s.Phone
+FROM 	Products p
+INNER JOIN Categories c
+ON 		c.CategoryID = p.CategoryID
+INNER JOIN Suppliers s
+ON 		s.SupplierID = p.SupplierID
+WHERE 	Discontinued = 0
+ORDER BY 	ProductName;
+
+-- 4. In the Sakila database, create a temporary view that lists films by number of rentals in descending order.  
+-- Include the film ID so that the view can be joined in another query as needed.
+
+CREATE TEMP VIEW IF NOT EXISTS vFilmsByRentals
+AS
+SELECT 		f.film_id, f.title, 
+ 			count(*) as Rentals 
+FROM			rental r
+INNER JOIN	inventory i
+ON			i.inventory_id = r.inventory_id
+INNER JOIN 	film f
+ON			f.film_id = i.film_id
+GROUP BY		f.film_id
+ORDER BY		Rentals DESC; 
+
+-- 3.9 - Combining Queries: Unions, Intersections and Exceptions
+	
+-- 3.9.1
+
+SELECT 	FirstName, LastName, Address, City, State,  
+ 		Country, PostalCode, "Customer" AS 
+ 		Relationship
+FROM 	customers
+UNION
+SELECT 	FirstName, LastName, Address, City, State, 
+ 		Country, PostalCode, "Employee" AS 
+ 		Relationship
+FROM 	employees
+ORDER BY 	LastName, FirstName;
+
+-- 3.9.2
+
+SELECT	FirstName, LastName
+FROM 	Chinook.employees
+UNION
+SELECT	FirstName, LastName
+FROM 	Northwind.employees
+UNION
+SELECT	first_name, last_name
+FROM		Sakila.staff
+ORDER BY 	LastName;
+
+-- 3.9.3
+
+SELECT	FirstName, LastName
+FROM 	Chinook.employees
+UNION ALL
+SELECT	FirstName, LastName
+FROM 	Northwind.employees
+UNION ALL
+SELECT	first_name, last_name
+FROM		Sakila.staff
+ORDER BY 	LastName;
 
 
+-- 3.9.4
+
+SELECT	FirstName, LastName
+FROM 	Chinook.employees
+INTERSECT
+SELECT	FirstName, LastName
+FROM 	Northwind.employees;
+
+-- 3.9.5
+
+SELECT		me.FirstName, me.LastName, me.phone, 
+ 			ne.FirstName, ne.LastName, ne.HomePhone
+FROM 		main.employees me
+INNER JOIN 	Northwind.Employees ne
+ON 			ne.FirstName = me.FirstName 
+AND 			ne.LastName = me.LastName;
+
+-- 3.9.6
+
+SELECT		me.FirstName, me.LastName, me.phone, 
+ 			ne.FirstName, ne.LastName, ne.HomePhone
+FROM 		main.employees me
+INNER JOIN 	Northwind.Employees ne
+ON 			ne.FirstName = me.FirstName 
+OR 			ne.LastName = me.LastName;
+
+-- 3.9.7
+
+SELECT 	ArtistId
+FROM 	Artists
+EXCEPT
+SELECT 	ArtistId
+FROM 	Albums;
+
+-- 3.9.8
+
+SELECT	Name as Artist
+FROM		artists
+WHERE 	ArtistId IN
+ 	(SELECT	ArtistId
+ 	FROM 	Artists
+ 	EXCEPT
+ 	SELECT	ArtistId
+ 	FROM		Albums)
+ 	ORDER BY	Artist;
+
+-- 3.9.9
+
+SELECT 	first_name, last_name, email
+FROM 	Sakila.customer
+WHERE 	customer_id IN
+ 	(SELECT 	Customer_ID
+ 	FROM 	sakila.Customer
+ 	EXCEPT
+ 	SELECT 	Customer_ID
+ 	FROM 	sakila.Rental
+ 	WHERE 	return_date IS NULL)
+AND active <> 0;
+
+-- 3.9 Challenge Solutions
+
+-- 1. In the Northwind database, write a basic EXCEPT query that will return a list of customers who have never placed orders.
+
+SELECT 	CustomerID
+FROM 	Northwind.Customers
+EXCEPT
+SELECT CustomerID
+FROM 	Northwind.Orders;
+
+-- 2. In the Chinook database, use an INTERSECT query to find the names of the employees who have acted 
+-- as customer support representatives.  Also use an EXCEPT query to find those who haven't.
+
+SELECT	LastName, FirstName
+FROM	employees
+WHERE	EmployeeId IN
+ 	(SELECT	EmployeeId
+ 	FROM		employees
+ 	INTERSECT
+ 	SELECT	SupportRepId
+ 	FROM		customers);
+
+-- You only need to change the INTERSECT to EXCEPT to find non-supporting employees.
+
+-- 3. Create a cross-database UNION query between the Chinook and Northwind databases to pull a mailing 
+-- list for all customers. Include the customer's company field and a field to indicate which company 
+-- the person is a customer of. The two databases store first and last names differently so you will need 
+-- to write the query to compensate for this. 
+
+SELECT 		CONCAT(FirstName, " ", LastName) AS [Customer  
+ 			Name], Company, Address, City, State, 
+ 			PostalCode, Country,"Chinook" AS [Vendor]
+FROM 		Chinook.customers
+UNION
+SELECT 		ContactName, CompanyName, Address, City, 
+ 			Region, PostalCode, Country, "Northwind" AS 
+ 			[Vendor]
+FROM 		Northwind.customers;
+
+-- 4. In any of the databases, write a query to determine if any of the employees are also representing 
+-- customers. You will probably need to change a customer name or contact name to match that of an employee.
+
+Northwind example:
+SELECT		c.ContactName, e.FirstName, e.LastName 
+FROM		Northwind.customers c
+INNER JOIN 	Northwind.employees e
+ON			CONCAT(e.FirstName, " ", e.LastName) =  
+ 				c.ContactName;
+Sakila:
+SELECT		c.first_name, c.last_name, s.first_name, 
+ 			s.last_name
+FROM		Sakila.customer c
+INNER JOIN 	Sakila.staff s
+ON			s.first_name = c.first_name
+AND		s.last_name = s.last_name;
+
+-- 5. In the Northwind database, the customer's contact address may be different than the shipping address on 
+-- their order.  Pull a unique list of all customer and shipping locations by city, state or region and postal 
+-- code. Sort it by the postal code.
+
+-- As an extra challenge, eliminate any records where the city, state and postal code are all NULL.
+
+SELECT DISTINCT 	city, Region, PostalCode 
+FROM 			Northwind.customers
+WHERE 			COALESCE(city, Region, PostalCode) 
+ 				IS NOT NULL
+UNION
+SELECT DISTINCT	ShipCity, ShipRegion, ShipPostalCode 
+FROM			Northwind.Orders
+WHERE			COALESCE(ShipCity, ShipRegion, 
+ 				ShipPostalCode) IS NOT NULL
+ORDER BY		PostalCode;
+
+-- The COALESCE function is one way of combining the three potentially NULL value into a single value that can be evaluated.
+
+-- 3.10 - Finding it Faster: Full Text Search
+
+-- 3.10.1
+
+CREATE VIRTUAL TABLE sakila.fts_films 
+USING FTS5(title, description);
+
+INSERT INTO fts_films(title, description)
+SELECT title, description FROM film;
+
+-- 3.10.2
+
+SELECT * FROM fts_films LIMIT 100;
+SELECT * FROM fts_films_content LIMIT 100;
+
+-- 3.10.3
+
+UPDATE film SET title = 'Apollo Teenagers' 
+WHERE title = 'Apollo Teen';
+
+SELECT * FROM fts_films WHERE fts_films MATCH 'Apollo';
 
 
+-- 3.10.4
 
+DROP TABLE IF EXISTS fts_films;
 
+CREATE VIRTUAL TABLE sakila.fts_films 
+USING FTS5(title, description, content=film, content_rowid=film_id);
 
+INSERT INTO sakila.fts_films(fts_films) VALUES ('rebuild');
 
+-- 3.10.5
 
+UPDATE film SET title = 'ACE WRITER' 
+WHERE title = 'ACE GOLDFINGER';
 
+SELECT * FROM fts_films 
+WHERE fts_films MATCH 'writer';
 
-			
+-- 3.10.6
 
+SELECT * FROM fts_films('explorer writer');
 
+-- 3.10.7
 
+SELECT * FROM fts_films ('out*');
 
+-- 3.10.8
 
+SELECT * FROM fts_films ('out* NOT outgun');
+SELECT * FROM fts_films ('out* AND thought*');
+SELECT * FROM fts_films ('data* OR thought*');
 
+-- 3.10.9
+SELECT * FROM fts_films ('explorer writer')
+ORDER BY title;
 
+-- 3.10.10
 
+SELECT * FROM fts_films 
+WHERE fts_films MATCH 'writer'
+ORDER BY rank;
 
+-- 3.10.11
 
+SELECT *, rank FROM fts_films 
+WHERE fts_films MATCH 'writer'
+ORDER BY rank;
 
+SELECT * FROM fts_films 
+WHERE fts_films MATCH 'writer'
+ORDER BY bm25(fts_films);
 
+-- 3.10.12
 
+SELECT title, highlight(fts_films, 1, '<b>', '</b>') AS Description 
+FROM fts_films 
+WHERE fts_films MATCH 'waitress';
 
+-- 3.10.13
+
+SELECT title, snippet(fts_films, 1, '[', ']', '...', 10) AS Description 
+FROM fts_films 
+WHERE fts_films MATCH 'student';
+
+-- 3.10 Challenge Solutions
+
+-- 1. In an earlier chapter on creating views in SQLite (3.8 – Storing Queries), you saw the
+-- vTrackListing view which drew from three tables in the Chinook database to present the album 
+-- and artist information on every track in the database. As an overview of this chapter, re-create 
+-- that view and then create a full-text search virtual table from it. 
+
+CREATE VIRTUAL TABLE fts_TrackListing 
+USING FTS5(TrackID, track, album, artist, composer, minutes, perunit, CONTENT=vTrackListing, CONTENT_ROWID=TrackID);
+
+INSERT INTO fts_TrackListing(fts_TrackListing) 
+VALUES ('rebuild');
+
+SELECT *, rank FROM fts_TrackListing 
+WHERE fts_TrackListing MATCH 'rock';
+
+SELECT *, rank 
+FROM fts_TrackListing 
+WHERE fts_TrackListing MATCH 'young*';
+
+-- 2. In your new virtual track listing table, find the record(s) that have words starting 
+-- with “wild” but not the word “wild” itself.
+
+SELECT * FROM fts_TrackListing 
+WHERE fts_TrackListing MATCH 'wild* NOT wild';
+
+-- 3. Search the track titles in your track listing table for the word “shout” and use the highlight() 
+-- function to place brackets around the word wherever it's found.
+
+SELECT highlight(fts_TrackListing, 1, '[', ']') as Track, Album, Artist 
+FROM fts_TrackListing 
+WHERE fts_TrackListing MATCH 'shout';
+
+-- 4. Using the FTS5 table in the Sakila database, find films that have both “teacher” and “scientist” 
+-- in the title. Limit the portion of the title returned to the 10 word portion containing the search terms.
+
+SELECT title, snippet(fts_films, 1, '[', ']', '...', 10) AS Description 
+FROM fts_films 
+WHERE fts_films MATCH 'scientist teacher';
 
 
