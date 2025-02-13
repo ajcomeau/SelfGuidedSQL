@@ -1341,7 +1341,8 @@ AND active <> 0;
 
 -- 3.9 Challenge Solutions
 
--- 1. In the Northwind database, write a basic EXCEPT query that will return a list of customers who have never placed orders.
+-- 1. In the Northwind database, write a basic EXCEPT query that will return a list of customers who have 
+-- never placed orders.
 
 SELECT 	CustomerID
 FROM 	Northwind.Customers
@@ -1539,5 +1540,279 @@ WHERE fts_TrackListing MATCH 'shout';
 SELECT title, snippet(fts_films, 1, '[', ']', '...', 10) AS Description 
 FROM fts_films 
 WHERE fts_films MATCH 'scientist teacher';
+
+
+-- 3.11 - Analysing Data: Window Functions
+
+-- 3.11.1
+
+SELECT 	row_number() OVER(ORDER BY total DESC) AS Row,
+ 		i.CustomerId, LastName, FirstName InvoiceDate, 
+ 		BillingCountry, total
+FROM 	invoices i
+INNER JOIN customers c
+ON 		c.CustomerId = i.CustomerId
+LIMIT 	10
+
+-- 3.11.2
+
+SELECT 	row_number() OVER() AS Row,
+ 		i.CustomerId, LastName, FirstName InvoiceDate, 
+ 		BillingCountry, total
+FROM 	invoices i
+INNER JOIN customers c
+ON 		c.CustomerId = i.CustomerId
+ORDER BY total DESC
+LIMIT 	10
+
+-- 3.11.3
+
+SELECT	* 
+FROM	(SELECT row_number() OVER(ORDER BY Track) AS Listing,
+ 		Track, Album, Artist, Composer, Minutes
+ 		FROM vTrackListing)
+WHERE 	Listing BETWEEN 100 and 149;
+
+-- 3.11.4
+
+SELECT 	row_number() OVER(PARTITION BY ShipCountry ORDER BY 
+ 		OrderDate) AS Row,
+ 		CustomerId, LastName, OrderDate, ShippedDate, 
+ 		ShipName, ShipCountry 
+FROM		Orders o 
+INNER JOIN Employees e 
+ON 		e.EmployeeId = o.EmployeeId 
+WHERE	e.LastName = 'Davolio'
+
+-- 3.11.5
+
+SELECT 	* 
+FROM
+ 	(SELECT	row_number() OVER(PARTITION BY ShipCountry 
+ 			ORDER BY OrderDate) AS Row, 
+ 			CustomerId, LastName, OrderDate, ShippedDate, 
+ 			ShipName, ShipCountry 
+ 	FROM		Northwind.Orders o 
+ 	INNER JOIN Northwind.Employees e 
+ 	ON 		e.EmployeeId = o.EmployeeId) 
+WHERE	Row = 1 
+ORDER BY	OrderDate;
+
+-- 3.11.6
+
+SELECT 	oq.OrderID, CustomerId, ShippedDate, Subtotal, 
+ 		SUM(Subtotal) over(PARTITION BY CustomerId 
+ 		ORDER BY ShippedDate 
+  		ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) 
+ 		AS [Customer Total] 
+FROM 	[Orders Qry] oq 
+INNER JOIN [Order Subtotals] os 
+ON		os.OrderID = oq.OrderID
+
+
+-- 3.11.7
+
+SELECT 	oq.OrderID, CustomerId, ShippedDate, Subtotal, 
+ 		SUM(Subtotal) over(PARTITION BY CustomerId 
+ 		ORDER BY ShippedDate 
+  		RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) 
+ 		AS [Customer Total] 
+FROM 	[Orders Qry] oq 
+INNER JOIN [Order Subtotals] os 
+ON		os.OrderID = oq.OrderID
+
+-- 3.11.8
+
+SELECT 	oq.OrderID, CustomerId, OrderDate, Subtotal, 
+ 		round(AVG(Subtotal) over(PARTITION BY CustomerId 
+ 		ORDER BY OrderDate 
+  		ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING), 2) 
+ 		AS [Customer Total] 
+FROM 	[Orders Qry] oq 
+INNER JOIN [Order Subtotals] os 
+ON		os.OrderID = oq.OrderID
+
+-- 3.11.9
+
+SELECT	ProductName, CategoryName, UnitPrice,
+ 		cume_dist() over(PARTITION BY CategoryName ORDER BY 
+ 		UnitPrice)
+FROM			Products p
+INNER JOIN	Categories c
+ON			c.CategoryID = p.CategoryID
+
+-- 3.11.10
+
+SELECT 	strftime('%Y', OrderDate) AS OrderYear, o.EmployeeId, 
+ 		e.FirstName, e.LastName,  count(o.orderid) AS [Order 
+ 		Count], 
+ 		rank() over(PARTITION BY strftime('%Y', OrderDate) 
+ 		ORDER BY count(o.orderid) DESC) AS Ranking
+FROM			orders o
+INNER JOIN	employees e
+ON			e.EmployeeId = o.EmployeeId
+GROUP BY		o.EmployeeId, OrderYear
+
+-- 3.11.11
+
+SELECT 	oq.OrderID, CustomerId, ShippedDate, Subtotal, 
+ 		first_value(Subtotal) over(PARTITION BY CustomerId) 
+ 		AS [First Order] 
+FROM			[Orders Qry] oq 
+INNER JOIN	[Order Subtotals] os 
+ON			os.OrderID = oq.OrderID
+
+-- 3.11.12
+
+SELECT 	oq.OrderID, CustomerId, ShippedDate, Subtotal, 
+ 		last_value(Subtotal) over(PARTITION BY CustomerId 
+ 		ORDER BY Subtotal RANGE BETWEEN UNBOUNDED 
+ 		PRECEDING AND UNBOUNDED FOLLOWING) AS [Max Order] 
+FROM		[Orders Qry] oq 
+INNER JOIN	[Order Subtotals] os  
+ON			os.OrderID = oq.OrderID
+
+-- 3.11.13
+
+SELECT 	oq.OrderID, CustomerId, ShippedDate, Subtotal, 
+ 		lag(Subtotal, 1, 0) over(PARTITION BY CustomerId 
+ 		ORDER BY ShippedDate) 
+ 		AS [Prev Total]
+FROM			[Orders Qry] oq 
+INNER JOIN 	[Order Subtotals] os
+ON			os.OrderID = oq.OrderID
+
+-- 3.11.14
+
+WITH OrderResults AS
+(SELECT 	oq.OrderID, CustomerId, ShippedDate, Subtotal, 
+ 		lag(Subtotal, 1, 0) over(PARTITION BY CustomerId 
+ 		ORDER BY ShippedDate) 
+ 		AS [Prev Total]
+FROM			[Orders Qry] oq 
+INNER JOIN 	[Order Subtotals] os
+ON			os.OrderID = oq.OrderID)
+SELECT 	OrderID, CustomerId, ShippedDate, Subtotal, 
+ 		[Prev Total]
+  		round(((Subtotal - [Prev Total]) / Subtotal) * 100, 2) 
+ 		AS [Pct. Change]
+FROM		OrderResults;
+
+-- 3/11.15
+
+SELECT		FirstName, LastName, Company, Phone, Fax, email, 
+			ntile (4) over(order by LastName) AS [Call Group]
+FROM		customers; 
+
+
+-- 3.11 Challenge Solutions
+
+/* 1.	Using the vTrackListing view in the Chinook database, generate a track listing with a column showing the total time 
+of all tracks for the artist shown in each row.  You will need to modify the vTrackListing view to have it return the raw 
+Milliseconds column in order to calculate an accurate total for each artist.
+
+After you modify vTrackListing, there are a couple ways you can do this.*/
+
+SELECT	track, album, artist, Minutes, strftime('%H:%M:%S', 
+ 		(sum(Milliseconds) over(PARTITION BY Artist))/1000, 
+ 		'unixepoch') 
+ 		AS [Artist Total] 
+FROM		vTrackListing 
+ORDER BY 	Artist, Album
+
+SELECT	track, album, artist, Minutes, 
+ 		strftime('%H:%M:%S', (sum(Milliseconds)  
+ 		over(PARTITION BY Artist ORDER BY Album RANGE BETWEEN 
+ 		UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING))  / 1000,  
+ 		'unixepoch') AS [Artist Total] 
+FROM		vTrackListing
+
+/* Unlike the row_number() function, other window functions allow the query's sort order to be changed either in the window 
+function or at the end of the query. In this case, if you do it within the function you need to use the window frame clause 
+shown in the second example to control the function's focus. You can try it with and without this clause to see the difference.
+
+2.	You can use window functions in combination with regular aggregate functions. Write a query using the Sakila film_list view 
+that will count the number of films each actor appears in and then rank the actors based on this number with the most films in 
+first place.*/
+
+SELECT 	actors, COUNT(*) as Roles, 
+ 		dense_rank() over(order by COUNT(*) desc) AS Place
+FROM		film_list
+GROUP BY	actors
+
+/*3.	After updating the Sakila film table with random release years, link to the film_list view to get the first movie 
+released by each actor. You can return the first film for each of the actors or the list of the actor's movies with the title 
+of the first movie.
+
+Film list with actor's introductory role:*/
+
+SELECT	fl.*, f.release_year, first_value(fl.title) 
+ 		over(PARTITION BY actors ORDER BY release_year) AS 
+ 		[Introductory Role]
+FROM		film_list fl
+INNER JOIN film f
+ON 		f.film_id = fl.FID
+
+/* First film listing for each actor. There probably will be multiple records for many actors because the random assignment 
+of years results in the actor having multiple roles that year:*/
+
+WITH Filmography AS 
+(SELECT	fl.*, f.release_year, 
+ 		rank() over(PARTITION BY actors ORDER BY release_year) 
+ 		AS [Intro Role]
+FROM			film_list fl
+INNER JOIN	film f
+ON			f.film_id = fl.FID)
+ 	SELECT	* 
+ 	FROM		Filmography
+ 	WHERE	[Intro Role] = 1
+
+/* 4.	In the Northwind database, create a query from the Products table that will show the price of each product and the 
+percentage it represents of the most expensive product price for that category. For example, under Condiments, "Vegie-Spread" 
+is the most expensive confection at a price of $43.90. "Aniseed Syrup" is $10 which represents a 22.78% comparison against 
+the higher price.*/
+
+WITH ProductList AS 
+(SELECT	ProductID, ProductName, CategoryID, 
+ 		UnitPrice, max(UnitPrice) over(PARTITION BY CategoryID) 
+ 		AS [Category High] FROM Northwind.Products)
+SELECT	ProductID, ProductName, CategoryName, UnitPrice, 
+ 		round((UnitPrice * 1.0 / [Category Leader]) * 100, 2) 
+ 		AS [Percent of Lead], [Category Leader]
+FROM 		ProductList pl
+INNER JOIN 	Categories c
+ON 			c.CategoryID = pl.CategoryID
+
+/*The common table expression provides the result of each category's high price so that the second query can use it in the 
+percentage calculation without running it twice. 
+
+Notice that the UnitPrice in the second query is multiplied by 1.0 to ensure a non-integer value. Remember that SQLite performs 
+integer division which would result in a false result if both prices were integers so it's necessary to change at least one to a 
+decimal value.
+
+5.	As a final challenge, in the Northwind database create a query that will read the total amount of invoicing for each month 
+and include a column that will show a running average of that total. You might have some trouble putting the monthly sales in 
+chronological order because of the way SQLite handles dates so don't be afraid to improvise with what you've learned about CTEs.*/
+
+WITH MonthlyTotals AS
+(SELECT	strftime('%m-%Y', ShippedDate) as Period, 
+ 		min(ShippedDate) AS ShipDate, 
+ 		sum(ExtendedPrice) AS Invoiced
+FROM		Northwind.Invoices
+WHERE	Period IS NOT NULL
+GROUP BY	Period)
+SELECT	Period, [Invoiced], round(avg(Invoiced) 
+ 		over(ORDER BY ShipDate ROWS BETWEEN UNBOUNDED PRECEDING 
+ 		AND CURRENT ROW), 2) AS [Running Average]
+FROM		MonthlyTotals
+
+/* Because SQLite treats the date as a string, it will sort the Period field created by 
+the strftime() function by month and then by year which is not chronological. So, I 
+decided to have it supply the first shipped date it found in each monthly period.  
+The second half the query can use this unformatted date to put the monthly billing 
+periods in order. */
+
+
+
 
 
