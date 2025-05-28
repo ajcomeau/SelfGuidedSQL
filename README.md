@@ -2,10 +2,14 @@
 
 Companion repository for the upcoming book, "Self-Guided SQL: Build your SQL Skills with SQLite"
 
-May 22, 2025 - 
+May 28, 2025 - 
 
 Self-Guided SQL is now complete! The full version is available in both PDF and EPUB formats on LeanPub.com. The latest update adds explanations of functions in SQLite with examples of many of the scalar functions available.
-The Kindle edition is now available for pre-order on Amazon.com. Order now and receive it when it's released on May 31, 2025.
+The SQL code file has been updated here. The Kindle edition is now available for pre-order on Amazon.com. Order now and receive it when it's released on May 31, 2025.
+
+LeanPub - https://leanpub.com/self-guided-sql
+
+Amazon.com - https://amzn.to/3HdqbBH
 
 April 30, 2025 - 
 
